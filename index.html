@@ -36,6 +36,10 @@
         let timeLeft = gameTime;     // 残り時間
         let startTime;               // ゲーム開始時刻
         let gameOver = false;        // ゲーム終了フラグ
+        let rankingSaved = false;    // ランキング保存済みフラグ
+        
+        // ランキングデータ
+        let rankings = [];           // トップ3のスコアを保存
         
         // プレイヤー（シャーレ）
         let player;
@@ -213,6 +217,9 @@
             
             // ゲーム開始時刻を記録
             startTime = millis();
+            
+            // ランキングの読み込み
+            loadRankings();
         }
         
         // p5.js メインループ
@@ -228,6 +235,12 @@
                 if (timeLeft <= 0) {
                     timeLeft = 0;
                     gameOver = true;
+                    
+                    // ランキングに追加（1回だけ）
+                    if (!rankingSaved) {
+                        saveRanking(score);
+                        rankingSaved = true;
+                    }
                 }
                 
                 // パーツの出現
@@ -272,6 +285,9 @@
                 
                 // UI表示
                 drawUI();
+                
+                // ランキング表示
+                drawRankings();
                 
                 // コンボメッセージ表示
                 if (comboMessageTimer > 0) {
@@ -398,6 +414,9 @@
         function drawGameOver() {
             background(20, 25, 40);
             
+            // ランキング表示
+            drawRankings();
+            
             push();
             textAlign(CENTER, CENTER);
             
@@ -418,6 +437,73 @@
             textStyle(NORMAL);
             text('お疲れ様でした！', width/2, height/2 + 80);
             text('リロードして再挑戦してね！', width/2, height/2 + 120);
+            
+            pop();
+        }
+        
+        // ランキングの読み込み
+        function loadRankings() {
+            let saved = localStorage.getItem('biobricks-rankings');
+            if (saved) {
+                rankings = JSON.parse(saved);
+            } else {
+                rankings = [];
+            }
+        }
+        
+        // ランキングの保存
+        function saveRanking(newScore) {
+            rankings.push(newScore);
+            rankings.sort((a, b) => b - a);  // 降順にソート
+            rankings = rankings.slice(0, 3);  // トップ3のみ保持
+            localStorage.setItem('biobricks-rankings', JSON.stringify(rankings));
+        }
+        
+        // ランキングの表示
+        function drawRankings() {
+            push();
+            
+            // ランキングパネルの背景
+            fill(0, 0, 0, 180);
+            noStroke();
+            rect(width - 180, 100, 160, 200, 10);
+            
+            // タイトル
+            fill(255, 215, 0);
+            textSize(20);
+            textStyle(BOLD);
+            textAlign(CENTER, TOP);
+            text('🏆 TOP 3 🏆', width - 100, 110);
+            
+            // ランキング表示
+            textAlign(LEFT, TOP);
+            textStyle(NORMAL);
+            let yPos = 150;
+            
+            for (let i = 0; i < 3; i++) {
+                // 順位の色
+                let rankColor;
+                if (i === 0) rankColor = color(255, 215, 0);      // 金色
+                else if (i === 1) rankColor = color(192, 192, 192); // 銀色
+                else rankColor = color(205, 127, 50);              // 銅色
+                
+                // 順位表示
+                fill(rankColor);
+                textSize(18);
+                text((i + 1) + '位', width - 165, yPos);
+                
+                // スコア表示
+                fill(255);
+                textSize(24);
+                if (i < rankings.length) {
+                    text(rankings[i], width - 120, yPos - 2);
+                } else {
+                    fill(100);
+                    text('---', width - 120, yPos - 2);
+                }
+                
+                yPos += 50;
+            }
             
             pop();
         }
