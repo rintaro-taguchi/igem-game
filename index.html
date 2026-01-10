@@ -421,6 +421,22 @@
             pop();
         }
         
+        // ゲームのリセット
+        function resetGame() {
+            score = 0;
+            timeLeft = gameTime;
+            gameOver = false;
+            rankingSaved = false;
+            fallingParts = [];
+            currentCombo = [];
+            comboMessage = '';
+            comboMessageTimer = 0;
+            glowTimer = 0;
+            frameCounter = 0;
+            player = new Player();
+            startTime = millis();
+        }
+        
         // ゲームオーバー画面
         function drawGameOver() {
             background(20, 25, 40);
@@ -450,7 +466,34 @@
             textSize(24);
             textStyle(NORMAL);
             text('お疲れ様でした！', 600, height/2 + 80);
-            text('リロードして再挑戦してね！', 600, height/2 + 120);
+            
+            // もう一度遊ぶボタン
+            let buttonX = 600;
+            let buttonY = height/2 + 140;
+            let buttonW = 200;
+            let buttonH = 50;
+            
+            // ボタンのホバー判定
+            let isHover = mouseX > buttonX - buttonW/2 && mouseX < buttonX + buttonW/2 &&
+                          mouseY > buttonY - buttonH/2 && mouseY < buttonY + buttonH/2;
+            
+            // ボタンの描画
+            if (isHover) {
+                fill(100, 255, 150);
+                cursor(HAND);
+            } else {
+                fill(50, 200, 100);
+                cursor(ARROW);
+            }
+            stroke(255);
+            strokeWeight(3);
+            rect(buttonX - buttonW/2, buttonY - buttonH/2, buttonW, buttonH, 10);
+            
+            fill(255);
+            noStroke();
+            textSize(24);
+            textStyle(BOLD);
+            text('もう一度遊ぶ', buttonX, buttonY);
             
             pop();
         }
@@ -639,6 +682,23 @@
             }
             
             pop();
+        }
+        
+        // マウスクリック時の処理
+        function mousePressed() {
+            if (gameOver) {
+                // ボタンの位置とサイズ
+                let buttonX = 600;
+                let buttonY = height/2 + 140;
+                let buttonW = 200;
+                let buttonH = 50;
+                
+                // ボタンがクリックされたか判定
+                if (mouseX > buttonX - buttonW/2 && mouseX < buttonX + buttonW/2 &&
+                    mouseY > buttonY - buttonH/2 && mouseY < buttonY + buttonH/2) {
+                    resetGame();
+                }
+            }
         }
         
         // レスポンシブ対応（ウィンドウサイズ変更時）
