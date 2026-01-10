@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioBricks Catch Game - iGEM</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Arial', sans-serif;
+        }
+        #canvas-container {
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    
+    <script>
+        // ゲームの状態管理
+        let score = 0;               // 現在のスコア
+        let gameTime = 60;           // ゲームの制限時間（秒）
+        let timeLeft = gameTime;     // 残り時間
+        let startTime;               // ゲーム開始時刻
+        let gameOver = false;        // ゲーム終了フラグ
+        
+        // プレイヤー（シャーレ）
+        let player;
+        
+        // 落ちてくるパーツの配列
+        let fallingParts = [];
+        let spawnInterval = 60;      // パーツの出現間隔（フレーム数）
+        let frameCounter = 0;
+        
+        // コンボシステム
+        let comboSequence = ['P', 'R', 'G', 'T'];  // 正しい順番
+        let currentCombo = [];                      // 現在のコンボ状態
+        let comboMessage = '';                      // コンボメッセージ
+        let comboMessageTimer = 0;                  // メッセージ表示時間
+        let glowTimer = 0;                          // シャーレの光る演出タイマー
+        
+        // パーツの種類定義
+        const partTypes = {
+            P: { name: 'Promoter', color: [255, 50, 50], shape: 'square', points: 10 },
+            R: { name: 'RBS', color: [255, 200, 0], shape: 'circle', points: 10 },
+            G: { name: 'Gene/GFP', color: [50, 255, 100], shape: 'capsule', points: 30 },
+            T: { name: 'Terminator', color: [50, 100, 255], shape: 'tshape', points: 10 },
+            X: { name: 'Antibiotics', color: [200, 50, 255], shape: 'spike', points: -50 }
+        };
+        
+        // プレイヤークラス（シャーレ）
+        class Player {
+            constructor() {
+                this.width = 100;
+                this.height = 20;
+                this.x = 400;
+                this.y = 550;
+                this.speed = 8;
+            }
+            
+            // 描画
+            draw() {
+                push();
+                translate(this.x, this.y);
+                
+                // 光る演出
+                if (glowTimer > 0) {
+                    fill(100, 255, 100, 150);
+                    noStroke();
+                    ellipse(0, 0, this.width + 30, this.height + 30);
+                }
+                
+                // シャーレ本体
+                fill(200, 220, 255);
+                stroke(100, 140, 200);
+                strokeWeight(3);
+                
+                // シャーレの形（楕円形）
+                ellipse(0, 0, this.width, this.height);
+                
+                // シャーレの蓋（上部の線）
+                stroke(80, 120, 180);
+                line(-this.width/2 + 10, 0, this.width/2 - 10, 0);
+                
+                pop();
+            }
+            
+            // 移動処理
+            update() {
+                // マウスでの操作
+                if (mouseX > 0 && mouseX < width) {
+                    this.x = mouseX;
+                }
+                
+                // キーボードでの操作
+                if (keyIsDown(LEFT_ARROW)) {
+                    this.x -= this.speed;
+                }
+                if (keyIsDown(RIGHT_ARROW)) {
+                    this.x += this.speed;
+                }
+                
+                // 画面外に出ないように制限
+                this.x = constrain(this.x, this.width/2, width - this.width/2);
+            }
+            
+            // 当たり判定
+            checkCollision(part) {
+                return (
+                    part.x > this.x - this.width/2 &&
+                    part.x < this.x + this.width/2 &&
+                    part.y > this.y - this.height/2 &&
+                    part.y < this.y + this.height/2
+                );
+            }
+        }
+        
+        // 落ちてくるパーツクラス
+        class FallingPart {
+            constructor(type) {
+                this.type = type;
+                this.info = partTypes[type];
+                this.x = random(50, width - 50);
+                this.y = -20;
+                this.size = 30;
+                this.speed = random(2, 4);
+                this.rotation = 0;
+            }
+            
+            // 描画
+            draw() {
+                push();
+                translate(this.x, this.y);
+                rotate(this.rotation);
+                
+                fill(this.info.color);
+                stroke(0);
+                strokeWeight(2);
+                
+                // 形状に応じて描画
+                switch(this.info.shape) {
+                    case 'square':
+                        rect(-this.size/2, -this.size/2, this.size, this.size);
+                        break;
+                    case 'circle':
+                        ellipse(0, 0, this.size, this.size);
+                        break;
+                    case 'capsule':
+                        // カプセル型
+                        rect(-this.size/2, -this.size/3, this.size, this.size/1.5, 15);
+                        break;
+                    case 'tshape':
+                        // T字型
+                        rect(-this.size/2, -this.size/4, this.size, this.size/4);
+                        rect(-this.size/6, -this.size/4, this.size/3, this.size);
+                        break;
+                    case 'spike':
+                        // トゲトゲ
+                        for (let i = 0; i < 8; i++) {
+                            let angle = (TWO_PI / 8) * i;
+                            let x1 = cos(angle) * this.size/4;
+                            let y1 = sin(angle) * this.size/4;
+                            let x2 = cos(angle) * this.size/2;
+                            let y2 = sin(angle) * this.size/2;
+                            triangle(0, 0, x1, y1, x2, y2);
+                        }
+                        break;
+                }
+                
+                // パーツのラベル
+                fill(255);
+                noStroke();
+                textAlign(CENTER, CENTER);
+                textSize(14);
+                textStyle(BOLD);
+                text(this.type, 0, 0);
+                
+                pop();
+            }
+            
+            // 更新
+            update() {
+                this.y += this.speed;
+                this.rotation += 0.05;
+            }
+            
+            // 画面外に出たか判定
+            isOffScreen() {
+                return this.y > height + 50;
+            }
+        }
+        
+        // p5.js セットアップ
+        function setup() {
+            let canvas = createCanvas(800, 600);
+            canvas.parent('canvas-container');
+            
+            // プレイヤーの初期化
+            player = new Player();
+            
+            // ゲーム開始時刻を記録
+            startTime = millis();
+        }
+        
+        // p5.js メインループ
+        function draw() {
+            // 背景
+            background(20, 25, 40);
+            
+            // ゲーム終了していない場合
+            if (!gameOver) {
+                // 残り時間の計算
+                timeLeft = gameTime - floor((millis() - startTime) / 1000);
+                
+                if (timeLeft <= 0) {
+                    timeLeft = 0;
+                    gameOver = true;
+                }
+                
+                // パーツの出現
+                frameCounter++;
+                if (frameCounter >= spawnInterval) {
+                    frameCounter = 0;
+                    let types = ['P', 'R', 'G', 'T', 'X'];
+                    let randomType = random(types);
+                    fallingParts.push(new FallingPart(randomType));
+                }
+                
+                // プレイヤーの更新と描画
+                player.update();
+                player.draw();
+                
+                // 落ちてくるパーツの更新と描画
+                for (let i = fallingParts.length - 1; i >= 0; i--) {
+                    let part = fallingParts[i];
+                    part.update();
+                    part.draw();
+                    
+                    // 当たり判定
+                    if (player.checkCollision(part)) {
+                        handleCatch(part);
+                        fallingParts.splice(i, 1);
+                    }
+                    // 画面外に出たら削除
+                    else if (part.isOffScreen()) {
+                        fallingParts.splice(i, 1);
+                    }
+                }
+                
+                // 光る演出のタイマー減少
+                if (glowTimer > 0) {
+                    glowTimer--;
+                }
+                
+                // コンボメッセージのタイマー減少
+                if (comboMessageTimer > 0) {
+                    comboMessageTimer--;
+                }
+                
+                // UI表示
+                drawUI();
+                
+                // コンボメッセージ表示
+                if (comboMessageTimer > 0) {
+                    push();
+                    textAlign(CENTER, CENTER);
+                    textSize(48);
+                    fill(100, 255, 100);
+                    stroke(255);
+                    strokeWeight(4);
+                    text(comboMessage, width/2, height/2);
+                    pop();
+                }
+            } else {
+                // ゲーム終了画面
+                drawGameOver();
+            }
+        }
+        
+        // パーツをキャッチしたときの処理
+        function handleCatch(part) {
+            // スコア加算
+            score += part.info.points;
+            
+            // Antibiotics以外の場合、コンボチェック
+            if (part.type !== 'X') {
+                // 次に拾うべきパーツと一致するか確認
+                let expectedPart = comboSequence[currentCombo.length];
+                
+                if (part.type === expectedPart) {
+                    currentCombo.push(part.type);
+                    
+                    // コンボ完成チェック
+                    if (currentCombo.length === comboSequence.length) {
+                        score += 200;  // ボーナス
+                        comboMessage = 'Circuit Complete!';
+                        comboMessageTimer = 120;  // 2秒間表示
+                        glowTimer = 30;  // 0.5秒間光る
+                        currentCombo = [];  // コンボリセット
+                    }
+                } else {
+                    // 順番が違う場合はコンボリセット
+                    currentCombo = [];
+                    // ただし、そのパーツがコンボの最初のパーツなら開始
+                    if (part.type === comboSequence[0]) {
+                        currentCombo.push(part.type);
+                    }
+                }
+            } else {
+                // Antibioticsを拾ったらコンボリセット
+                currentCombo = [];
+            }
+        }
+        
+        // UI表示
+        function drawUI() {
+            push();
+            
+            // 背景パネル
+            fill(0, 0, 0, 150);
+            noStroke();
+            rect(0, 0, width, 80);
+            
+            // スコア表示
+            fill(255);
+            textSize(24);
+            textAlign(LEFT, TOP);
+            text('スコア: ' + score, 20, 15);
+            
+            // 残り時間表示
+            textAlign(RIGHT, TOP);
+            fill(timeLeft <= 10 ? color(255, 100, 100) : color(255));
+            text('残り時間: ' + timeLeft + '秒', width - 20, 15);
+            
+            // 次に拾うべきパーツのヒント
+            textAlign(LEFT, TOP);
+            textSize(18);
+            fill(200, 255, 200);
+            text('コンボヒント:', 20, 50);
+            
+            let hintX = 150;
+            for (let i = 0; i < comboSequence.length; i++) {
+                let partType = comboSequence[i];
+                let partInfo = partTypes[partType];
+                
+                // 既に拾ったパーツは明るく表示
+                if (i < currentCombo.length) {
+                    fill(partInfo.color);
+                    stroke(255);
+                    strokeWeight(3);
+                } else if (i === currentCombo.length) {
+                    // 次に拾うべきパーツを強調
+                    fill(partInfo.color);
+                    stroke(255, 255, 0);
+                    strokeWeight(3);
+                } else {
+                    // まだ拾っていないパーツは薄く表示
+                    fill(partInfo.color[0], partInfo.color[1], partInfo.color[2], 100);
+                    stroke(150);
+                    strokeWeight(1);
+                }
+                
+                rect(hintX, 45, 30, 30, 5);
+                
+                fill(255);
+                noStroke();
+                textAlign(CENTER, CENTER);
+                textSize(16);
+                text(partType, hintX + 15, 60);
+                
+                hintX += 40;
+                
+                // 矢印を表示
+                if (i < comboSequence.length - 1) {
+                    fill(150);
+                    textSize(20);
+                    text('→', hintX - 20, 60);
+                }
+            }
+            
+            pop();
+        }
+        
+        // ゲームオーバー画面
+        function drawGameOver() {
+            background(20, 25, 40);
+            
+            push();
+            textAlign(CENTER, CENTER);
+            
+            // タイトル
+            fill(255, 200, 100);
+            textSize(48);
+            textStyle(BOLD);
+            text('ゲーム終了！', width/2, height/2 - 100);
+            
+            // 最終スコア
+            fill(100, 255, 150);
+            textSize(64);
+            text('Total Score: ' + score, width/2, height/2);
+            
+            // メッセージ
+            fill(200);
+            textSize(24);
+            textStyle(NORMAL);
+            text('お疲れ様でした！', width/2, height/2 + 80);
+            text('リロードして再挑戦してね！', width/2, height/2 + 120);
+            
+            pop();
+        }
+        
+        // レスポンシブ対応（ウィンドウサイズ変更時）
+        function windowResized() {
+            // 小さい画面では縮小表示
+            let canvasWidth = min(windowWidth - 20, 800);
+            let canvasHeight = (canvasWidth / 800) * 600;
+            resizeCanvas(canvasWidth, canvasHeight);
+            
+            // プレイヤー位置の調整
+            if (player) {
+                player.x = constrain(player.x, player.width/2, width - player.width/2);
+                player.y = height - 50;
+            }
+        }
+    </script>
+</body>
+</html>
