@@ -70,10 +70,11 @@
             constructor() {
                 this.width = 100;
                 this.height = 20;
-                this.x = 400;
+                this.x = 600;  // 中央に配置
                 this.y = 550;
                 this.speed = 8;
-                this.gameAreaWidth = 800;  // ゲームエリアの幅
+                this.gameAreaLeft = 200;   // ゲームエリアの左端
+                this.gameAreaRight = 1000; // ゲームエリアの右端
             }
             
             // 描画
@@ -106,7 +107,7 @@
             // 移動処理
             update() {
                 // マウスでの操作（ゲームエリア内のみ）
-                if (mouseX > 0 && mouseX < this.gameAreaWidth) {
+                if (mouseX > this.gameAreaLeft && mouseX < this.gameAreaRight) {
                     this.x = mouseX;
                 }
                 
@@ -119,7 +120,7 @@
                 }
                 
                 // ゲームエリア内に制限
-                this.x = constrain(this.x, this.width/2, this.gameAreaWidth - this.width/2);
+                this.x = constrain(this.x, this.gameAreaLeft + this.width/2, this.gameAreaRight - this.width/2);
             }
             
             // 当たり判定
@@ -138,7 +139,7 @@
             constructor(type) {
                 this.type = type;
                 this.info = partTypes[type];
-                this.x = random(50, 750);  // ゲームエリア内（800px）に制限
+                this.x = random(250, 950);  // ゲームエリア内（200-1000px）に制限
                 this.y = -20;
                 this.size = 30;
                 this.speed = random(2, 4);
@@ -210,7 +211,7 @@
         
         // p5.js セットアップ
         function setup() {
-            let canvas = createCanvas(1000, 600);
+            let canvas = createCanvas(1200, 600);
             canvas.parent('canvas-container');
             
             // プレイヤーの初期化
@@ -228,10 +229,11 @@
             // 背景
             background(20, 25, 40);
             
-            // ゲームエリアとランキングエリアの区切り線
+            // エリアの区切り線
             stroke(100, 100, 150);
             strokeWeight(2);
-            line(800, 0, 800, height);
+            line(200, 0, 200, height);  // 左側の区切り線
+            line(1000, 0, 1000, height); // 右側の区切り線
             
             // ゲーム終了していない場合
             if (!gameOver) {
@@ -291,6 +293,9 @@
                 
                 // UI表示
                 drawUI();
+                
+                // 得点表表示
+                drawScoreTable();
                 
                 // ランキング表示
                 drawRankings();
@@ -354,26 +359,26 @@
             // 背景パネル（ゲームエリアのみ）
             fill(0, 0, 0, 150);
             noStroke();
-            rect(0, 0, 800, 80);
+            rect(200, 0, 800, 80);
             
             // スコア表示
             fill(255);
             textSize(24);
             textAlign(LEFT, TOP);
-            text('スコア: ' + score, 20, 15);
+            text('スコア: ' + score, 220, 15);
             
             // 残り時間表示
             textAlign(RIGHT, TOP);
             fill(timeLeft <= 10 ? color(255, 100, 100) : color(255));
-            text('残り時間: ' + timeLeft + '秒', width - 20, 15);
+            text('残り時間: ' + timeLeft + '秒', 980, 15);
             
             // 次に拾うべきパーツのヒント
             textAlign(LEFT, TOP);
             textSize(18);
             fill(200, 255, 200);
-            text('コンボヒント:', 20, 50);
+            text('コンボヒント:', 220, 50);
             
-            let hintX = 150;
+            let hintX = 350;
             for (let i = 0; i < comboSequence.length; i++) {
                 let partType = comboSequence[i];
                 let partInfo = partTypes[partType];
@@ -420,29 +425,157 @@
         function drawGameOver() {
             background(20, 25, 40);
             
+            // 得点表表示
+            drawScoreTable();
+            
             // ランキング表示
             drawRankings();
             
             push();
             textAlign(CENTER, CENTER);
             
-            // タイトル（ゲームエリア中央）
+            // タイトル（画面中央）
             fill(255, 200, 100);
             textSize(48);
             textStyle(BOLD);
-            text('ゲーム終了！', 400, height/2 - 100);
+            text('ゲーム終了！', 600, height/2 - 100);
             
             // 最終スコア
             fill(100, 255, 150);
             textSize(64);
-            text('Total Score: ' + score, 400, height/2);
+            text('Total Score: ' + score, 600, height/2);
             
             // メッセージ
             fill(200);
             textSize(24);
             textStyle(NORMAL);
-            text('お疲れ様でした！', 400, height/2 + 80);
-            text('リロードして再挑戦してね！', 400, height/2 + 120);
+            text('お疲れ様でした！', 600, height/2 + 80);
+            text('リロードして再挑戦してね！', 600, height/2 + 120);
+            
+            pop();
+        }
+        
+        // 得点表の表示
+        function drawScoreTable() {
+            push();
+            
+            // 得点表パネルの背景
+            fill(0, 0, 0, 180);
+            noStroke();
+            rect(20, 100, 160, 380, 10);
+            
+            // タイトル
+            fill(100, 200, 255);
+            textSize(20);
+            textStyle(BOLD);
+            textAlign(CENTER, TOP);
+            text('📊 得点表 📊', 100, 110);
+            
+            // 各パーツの得点表示
+            textAlign(LEFT, TOP);
+            textStyle(NORMAL);
+            let yPos = 150;
+            
+            // Promoter
+            fill(partTypes.P.color);
+            rect(35, yPos, 25, 25, 3);
+            fill(255);
+            textSize(14);
+            text('P', 42, yPos + 5);
+            fill(200);
+            textSize(12);
+            text('Promoter', 70, yPos + 2);
+            fill(255, 200, 100);
+            textSize(16);
+            text('+10', 70, yPos + 16);
+            yPos += 45;
+            
+            // RBS
+            fill(partTypes.R.color);
+            ellipse(47, yPos + 12, 25, 25);
+            fill(255);
+            textSize(14);
+            text('R', 42, yPos + 5);
+            fill(200);
+            textSize(12);
+            text('RBS', 70, yPos + 2);
+            fill(255, 200, 100);
+            textSize(16);
+            text('+10', 70, yPos + 16);
+            yPos += 45;
+            
+            // Gene/GFP
+            fill(partTypes.G.color);
+            rect(35, yPos + 4, 25, 18, 8);
+            fill(255);
+            textSize(14);
+            text('G', 41, yPos + 5);
+            fill(200);
+            textSize(12);
+            text('Gene/GFP', 70, yPos + 2);
+            fill(255, 200, 100);
+            textSize(16);
+            text('+30', 70, yPos + 16);
+            yPos += 45;
+            
+            // Terminator
+            fill(partTypes.T.color);
+            rect(35, yPos + 8, 25, 4);
+            rect(44, yPos + 8, 7, 18);
+            fill(255);
+            textSize(14);
+            text('T', 43, yPos + 8);
+            fill(200);
+            textSize(12);
+            text('Terminator', 70, yPos + 2);
+            fill(255, 200, 100);
+            textSize(16);
+            text('+10', 70, yPos + 16);
+            yPos += 45;
+            
+            // Antibiotics
+            fill(partTypes.X.color);
+            for (let i = 0; i < 8; i++) {
+                let angle = (TWO_PI / 8) * i;
+                let x1 = 47 + cos(angle) * 4;
+                let y1 = yPos + 12 + sin(angle) * 4;
+                let x2 = 47 + cos(angle) * 12;
+                let y2 = yPos + 12 + sin(angle) * 12;
+                triangle(47, yPos + 12, x1, y1, x2, y2);
+            }
+            fill(255);
+            textSize(14);
+            text('X', 42, yPos + 5);
+            fill(200);
+            textSize(12);
+            text('Antibiotics', 70, yPos + 2);
+            fill(255, 100, 100);
+            textSize(16);
+            text('-50', 70, yPos + 16);
+            yPos += 55;
+            
+            // コンボボーナス
+            stroke(255, 215, 0);
+            strokeWeight(2);
+            noFill();
+            rect(25, yPos, 150, 70, 8);
+            noStroke();
+            
+            fill(255, 215, 0);
+            textSize(16);
+            textStyle(BOLD);
+            textAlign(CENTER, TOP);
+            text('⚡ コンボボーナス ⚡', 100, yPos + 8);
+            
+            fill(200);
+            textSize(12);
+            textStyle(NORMAL);
+            text('P → R → G → T', 100, yPos + 30);
+            
+            fill(100, 255, 100);
+            textSize(20);
+            textStyle(BOLD);
+            text('+200', 100, yPos + 46);
             
             pop();
         }
@@ -472,14 +605,14 @@
             // ランキングパネルの背景
             fill(0, 0, 0, 180);
             noStroke();
-            rect(820, 100, 160, 200, 10);
+            rect(1020, 100, 160, 200, 10);
             
             // タイトル
             fill(255, 215, 0);
             textSize(20);
             textStyle(BOLD);
             textAlign(CENTER, TOP);
-            text('🏆 TOP 3 🏆', 900, 110);
+            text('🏆 TOP 3 🏆', 1100, 110);
             
             // ランキング表示
             textAlign(LEFT, TOP);
@@ -496,16 +629,16 @@
                 // 順位表示
                 fill(rankColor);
                 textSize(18);
-                text((i + 1) + '位', 835, yPos);
+                text((i + 1) + '位', 1035, yPos);
                 
                 // スコア表示
                 fill(255);
                 textSize(24);
                 if (i < rankings.length) {
-                    text(rankings[i], 880, yPos - 2);
+                    text(rankings[i], 1080, yPos - 2);
                 } else {
                     fill(100);
-                    text('---', 880, yPos - 2);
+                    text('---', 1080, yPos - 2);
                 }
                 
                 yPos += 50;
@@ -517,8 +650,8 @@
         // レスポンシブ対応（ウィンドウサイズ変更時）
         function windowResized() {
             // 小さい画面では縮小表示
-            let canvasWidth = min(windowWidth - 20, 1000);
-            let canvasHeight = (canvasWidth / 1000) * 600;
+            let canvasWidth = min(windowWidth - 20, 1200);
+            let canvasHeight = (canvasWidth / 1200) * 600;
             resizeCanvas(canvasWidth, canvasHeight);
             
             // プレイヤー位置の調整
