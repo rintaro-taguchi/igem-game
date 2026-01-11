@@ -619,7 +619,7 @@
         
         // ランキングの読み込み
         function loadRankings() {
-            let saved = localStorage.getItem('biobricks-rankings');
+            let saved = sessionStorage.getItem('biobricks-rankings');
             if (saved) {
                 rankings = JSON.parse(saved);
             } else {
@@ -632,7 +632,7 @@
             rankings.push(newScore);
             rankings.sort((a, b) => b - a);  // 降順にソート
             rankings = rankings.slice(0, 3);  // トップ3のみ保持
-            localStorage.setItem('biobricks-rankings', JSON.stringify(rankings));
+            sessionStorage.setItem('biobricks-rankings', JSON.stringify(rankings));
         }
         
         // ランキングの表示
